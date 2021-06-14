@@ -1,0 +1,111 @@
+#load twitter library and stuff to analyze
+library(rtweet)
+library(tidytext)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(statsr)
+library(ggsignif)
+library(wesanderson)
+library(RColorBrewer)
+library(lubridate)
+source("Side_functions.R")
+#after scrapping with twitter_scrapping_twint.py need to load our csv.
+
+dirty_file <-  read.csv("depresyon2.csv", encoding = "UTF-8")
+only_date_n_tweet<- data.frame()
+only_date_n_tweet<- dirty_file %>% select(date,time,tweet) 
+only_date_n_tweet<- only_date_n_tweet %>% mutate(date = as.Date(date))%>%mutate(month = format(date,"%m"),year = format(date, "%Y"))%>% group_by(month, year)
+count_by_months <- only_date_n_tweet %>% count(date, name = "count_of_tweet_per_day") # calculated number of tweets per day by counting unique dates. 
+count_by_twets <- only_date_n_tweet %>% count(tweet, name = "count_of_tweet_per_day")
+
+#for this analysis we only need the dates and tweet. Since we are looking at numbers of tweets per mon
+
+average_count_by_months<- count_by_months %>% summarise(avg_tweets = mean(count_of_tweet_per_day)) %>% arrange(year)  #'buraya bak'
+average_count_by_months %>% ggplot(aes(x= month, y = avg_tweets)) + geom_bar(stat='identity')
+
+#create a month-year column
+average_count_by_months$month_year <- paste(average_count_by_months$year,average_count_by_months$month,"01", sep = '-') #combines to columns into one month_year column 
+average_count_by_months$month_year <- as.Date(average_count_by_months$month_year,format = c("%Y-%m-%d"))   #formats month_year into date class
+
+
+#only look at months b/w 4-12
+monthsave_excep<- subset(average_count_by_months, month >3 )
+monthsave_excep %>% ggplot(aes(x= month, y = avg_tweets)) + geom_bar(stat='identity')
+
+#only look at year 2019
+nb.cols <- 12 #number of colors I want
+mycolors <- colorRampPalette(wes_palette("Darjeeling1"))(nb.cols) 
+#this function amplifies the pallete to have 12 colors instead of it's own 5 colors.
+only_2019 <- subset(average_count_by_months, year == 2019 )
+plot_2019<-only_2019 %>% ggplot(aes(x= month, y = avg_tweets,fill = month)) + geom_bar(stat='identity',show.legend = FALSE)+
+        scale_fill_manual(values = mycolors) + coord_cartesian(ylim=c(100, 500))+ylab("Gunluk ortalama Tweet sayisi") + 
+        xlab("Ay") + ggtitle("2019 yili aylarinda depresyonla ilgili ortalama gunluk tweet sayisi")
+
+#only look at 2020
+
+only_2020 <- subset(average_count_by_months, year == 2020 )
+plot_2020 <-only_2020 %>% ggplot(aes(x= month, y = avg_tweets,fill = month)) + geom_bar(stat='identity',show.legend = FALSE)+
+        scale_fill_manual(values = mycolors)+coord_cartesian(ylim=c(100, 500))+
+        ylab("Gunluk ortalama tweet sayisi") + xlab("Ay") + ggtitle("2020 yili aylarinda depresyonla ilgili ortalama gunluk tweet sayisi")
+        
+
+#t test comparing means of 2019 march tweet numbers to 2020 march tweet numbers
+march2019 <- data.frame()
+march2019<- count_by_months %>% select(month, year, date, n)
+march2019<- subset(count_by_months,subset = year == 2019 & month == "03")
+#create data frames wth just march from 2019 and 2021.
+
+march2021 <- data.frame()
+march2021<- count_by_months %>% select(month, year, date, n)
+march2021<- subset(count_by_months,year == 2021)
+march2021<- subset(march2021,month == "03")
+
+
+#create data vectors for respective times.
+
+v_march2019 <- vector()
+v_march2019<- c(v_march2019, march2019$count_of_tweet_per_day)
+
+v_march2021 <- vector()
+v_march2021<- c(v_march2021, march2021$count_of_tweet_per_day)
+
+#check for normality with Shapiro-Wilk test
+shapiro.test(v_march2019)
+shapiro.test(v_march2021)
+#t test by default, unpaired. check this.!
+t.test(v_march2019,v_march2021)
+
+#graph these
+
+march_graph_data <- rbind(march2019,march2021)
+comparing_march_plot <- march_graph_data %>% ggplot(aes(x = year, y = count_of_tweet_per_day, fill = year))+geom_bar(stat="identity", width = 0.3, size = 0.4,show.legend = FALSE)+
+        coord_cartesian(ylim=c(0, 10000))+ylab("Tweet sayisi") + xlab("Yil") + ggtitle("2019 ve 2021 yillarinda depresyonla ilgili atilan tweet sayisi")+
+        ggsignif::geom_signif(comparisons = list(c("2019","2021")),map_signif_level = TRUE, y_position = 9000,test = "t.test")
+
+#add significance label
+
+#montly tweet averages over 2018-2021
+monthly_average_daily_tweet_plot <- average_count_by_months %>% ggplot(aes(x = month_year, y = avg_tweets,group = 1, color = "orange", show.legend = FALSE))+
+        geom_point(size = 3,show.legend = FALSE)+geom_smooth(method = "auto", se =TRUE,level = 0.95,color = "cyan2", show.legend = FALSE, size = 2 )+
+        ggtitle("2018-2021 arasi aylar boyu depresyonla ilgili gunluk ortalama atilan tweet sayisi")+
+        ylab("Gunluk Ortalama Tweet Sayisi") + xlab("Tarih")
+                
+#as a line graph
+
+line_monthly <-  average_count_by_months %>% ggplot(aes(x = factor(month), y = avg_tweets,group = factor(year), color = factor(year),subset() )) + geom_line(size = 2) + geom_point(size=1, color = "black")+coord_cartesian(ylim=c(50, 550))+scale_color_manual(values = wes_palette("Darjeeling1"))+
+        ggtitle("2018-2021 yillari aylar boyu gunluk ortalama depresyon ile ilgili tweet") +xlab("Ay")+
+        ylab("Gunluk ortalama tweet")+labs(colour="Yil")
+
+##to do AYLIK ORTALAMALARI AL, AYDAKI GUNLUK DEGIL eg: butun mart toplansin, butun subat vs vs... suanda aylik ortalama gunluk rakami veriyor.
+monthly<- count_by_months %>% group_by(month = floor_date(date, "month")) %>% summarise(number_of_tweets = sum(n))  #lubridate ile. aylik toplam sayilar
+
+average_monthly_tweet_plot <- monthly %>% ggplot(aes(x = month, y = number_of_tweets,group = 1, color = "orange", show.legend = FALSE))+
+        geom_point(size = 3,show.legend = FALSE)+geom_smooth(method = "auto", se =TRUE,level = 0.95,color = "cyan2", show.legend = FALSE, size = 2 )+
+        ggtitle("2018-2021 arasi depresyonla ilgili aylik atilan tweet sayisi")+
+        ylab("Aylik Tweet Sayisi") + xlab("Tarih")
+
+#for the next part lets remove punctuations from the tweets.
+#str_replace_all(X,"[:punct:]",""
+
+        

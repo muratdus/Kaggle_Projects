@@ -1,0 +1,28 @@
+{
+    "id": "B4415C6B",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1623218790177.0,
+    "source_on_save": false,
+    "relative_order": 14,
+    "properties": {
+        "id": "f9925af435a4485fbb9e400e20530fe1",
+        "name": "DT_train_result",
+        "title": "DT_train_result",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 2314885530818453514,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1623218790177,
+    "read_only": false,
+    "read_only_alternatives": []
+}

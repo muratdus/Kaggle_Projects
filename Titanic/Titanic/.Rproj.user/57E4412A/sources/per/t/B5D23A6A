@@ -1,0 +1,28 @@
+{
+    "id": "B5D23A6A",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1623218794485.0,
+    "source_on_save": false,
+    "relative_order": 16,
+    "properties": {
+        "id": "d7cd2914539d436d90f37845bcbf12cd",
+        "name": "logisticAIC_train_result",
+        "title": "logisticAIC_train_result",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 2178256899320,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1623218794485,
+    "read_only": false,
+    "read_only_alternatives": []
+}

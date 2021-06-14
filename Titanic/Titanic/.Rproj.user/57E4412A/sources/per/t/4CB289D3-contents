@@ -1,0 +1,263 @@
+---
+title: "Regression_Models_Assignment"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+Load data and libraries                              
+```{r}
+
+data("mtcars")
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(car)
+library(stats)
+library(ggpubr)
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering algorithms & visualization
+library(olsrr)
+```
+
+Some cleaning up 
+```{r}
+#want to make transmission type Auto for 0 and Man for 1. 
+
+mtcars <- mtcars %>% mutate(transmission = am ) 
+mtcars$transmission <- as.factor(mtcars$transmission)
+levels(mtcars$transmission) <- c("Automatic", "Manual")
+
+```
+
+
+Exploratory data analysis
+
+
+```{r}
+dim(mtcars)
+hist(mtcars$am)
+table(mtcars$transmission)
+hist(mtcars$mpg)
+summary(mtcars$mpg)
+hist(mtcars$hp)
+summary(mtcars$hp)
+hist(mtcars$wt)
+summary(mtcars$wt)
+```
+
+Some plots
+
+```{r}
+
+par(mfrow = c(2,2))
+plot(mtcars$hp, mtcars$mpg)
+plot(mtcars$wt, mtcars$mpg)
+plot(mtcars$transmission, mtcars$mpg, ylab = "mpg", xlab= "transmission type")
+```
+
+Manual transmission seems bit more variable and has a higher mpg. Let's check
+
+```{r}
+group_by(mtcars,transmission) %>%  summarise(mean = mean(mpg), sd = sd(mpg))
+
+```
+Let's quantify that with statistics by comparing means
+
+```{r, echo=TRUE}
+#create two data frames with mpg and by transmission type
+
+auto_mpg <- mtcars %>% filter(transmission == "Automatic") %>% select(mpg) 
+manual_mpg <- mtcars %>% filter(transmission == "Manual") %>% select(mpg) 
+
+#testing for normality
+ggdensity(auto_mpg$mpg, xlab = "mpg_auto")
+ggdensity(manual_mpg$mpg,xlab = "mpg_man")
+
+#q-q plot 
+ggqqplot(manual_mpg$mpg)
+
+#seems not significantly different from normal
+shapiro.test(manual_mpg$mpg)
+
+#check for variance equality with F test
+
+ftest <- var.test(auto_mpg$mpg,manual_mpg$mpg)
+ftest
+#no significant difference in variances
+
+t.test(auto_mpg, manual_mpg, paired = FALSE)
+```
+
+There is significant difference in MPG usage between automatic transmission cars and manual transmission cars. As we get a p-value<0.05. 
+
+
+A little bit more exploration of data by looking at clusters. Using k-means clustering.
+```{r}
+
+to_cluster <- select(mtcars, c(mpg,wt,cyl))
+
+#center and scale
+to_cluster <- data.frame(scale(to_cluster))
+
+#need to find an optimal cluster number, k, using the "Elbow method"
+#returns the kmeans total with in ss for a given k.
+
+kmean_withinss <- function(k) { 
+        cluster <-  kmeans(to_cluster,k)
+        return (cluster$tot.withinss)
+}
+#define maximum cluster number
+max_k <- 10
+#run this function max_k-1 times. and we store the within ss for each k in wss.
+wss <- sapply(2:max_k,kmean_withinss)
+#convert that to the data frame
+wss_dat <- data.frame(2:max_k,wss)
+#plot that to see where it becomes diminished. in this case I choose 3 as we don't want to overfit and after 4 the change in wss is not as big. 
+ggplot(wss_dat,aes(x = X2.max_k, y = wss))+geom_line()+geom_point()
+
+#running kmeans with 4 clusters.
+
+fviz_nbclust(to_cluster,kmeans,method ="wss")  #same function but from a library
+#
+
+cluster2 <- kmeans(to_cluster, 4)
+cluster2
+
+#par(mfrow =c(3,3))
+#plot(to_cluster,col = cluster2$cluster)
+
+#this function returns graphs of the clusters after doing a PCA analysis. 
+fviz_cluster(cluster2, data = to_cluster) 
+
+```
+
+Let's create a linear model
+
+```{r}
+fit <- lm(mpg ~ am, data =  mtcars)
+summary(fit)
+
+```
+We see that, the transmission type is a significant factor that predicts the mpg(p = 0.0003)<0.05. The manual transmission increases the mpg value by 7.245 mpg.  And transmission type explains 35% of the total variation. (R-squared :0.36)
+
+Let's assess the residuals
+
+```{r}
+
+plot(fit)
+
+```
+As expected it is not the best model to predict mpg by transmission, as the predictor is binary and the predicted is a continuous variable. So it is not very informative as single linear regression model.
+
+Maybe a better model 
+```{r}
+fit2 <- lm(mpg~ factor(am)+ ., mtcars)
+best.model <- step(fit2)
+summary(best.model)
+
+
+```
+This is a much better model and transmission type is still relevant to the prediction. In this case, manual transmission increases millage per gallon by 2.94.
+
+Let's check the confidence interval for our intercept and coefficients. As can be seen, our estimates are within the 95% confidence intervals.
+
+```{r}
+confint(best.model)
+
+```
+
+We can check the prediction confidence intervals as well as regression line.  As expected, regression line is has a narrower confidence interval
+
+```{r}
+predict(best.model, newdata = mtcars, interval = "confidence")
+predict(best.model, newdata = mtcars, interval = "prediction")
+
+plot(predict(best.model, newdata = mtcars), axes = FALSE, xlab = "", ylab= "")
+par(new =TRUE)
+plot(mtcars$mpg, col="red", type = "p", axes = TRUE, xlab = "", ylab = "")
+title(main="Predicted vs Observed",xlab="Index", ylab="MPG")
+abline(best.model)
+#lines(, preds[ ,3], lty = 'dashed', col = 'red')
+```
+
+
+
+In this model we could achieve an R square value of 0.85. So we can explain 85% of the variation with this multiple regression. Each regressor seems to be significant. Our model also considers transmission time which is important for our hypothesis/research question.
+
+```{r, echo = TRUE}
+plot(best.model)
+
+par(mfrow = c(1,2))
+
+plot(hatvalues(best.model),main = "HATVALUES") # measure leverage for each data point
+n_of_predictor <- max(best.model$assign)+1
+dfitts_threshold <- 2*sqrt((n_of_predictor+1)/(nrow(mtcars)-1))
+
+plot(dffits(best.model), main = "DFFITS") #measure influence for each data point. How much it changes regression line.
+abline(h = c(-1,1)*dfitts_threshold, col = "red" )
+
+#or with this function
+#ols_plot_dffits(best.model)
+
+
+a <-  dfbetas(best.model)
+par(mfrow = c(2,2))
+dfbeta_threshold <- 2/sqrt(nrow(mtcars))  
+for (i in colnames(a)) {
+plot(dfbetas(best.model)[,i], main = paste("DFBETAS", i, sep = " "))
+abline(h = c(-1,1)*dfbeta_threshold, col = "red")
+}
+
+#or with this function 
+#ols_plot_dfbetas(best.model)
+
+
+```
+There is no systematic pattern in residual vs fitted values graph, no indication of heteroscastisity.  In dffits graph, there is one point that might be above >1 which might indicate high influence for this size of dataset.  In weight dfbeta plot, there is one point that is above 1, which might be suspicious to be an outlier. 
+
+```{r}
+influence.measures(best.model)
+```
+
+There are three points that influences the model. 
+
+```{r}
+mtcars[which(hatvalues(best.model)>0.2),]
+mtcars[which(a[,2]>1),]
+```
+Let's check if these are significant outliers...
+
+
+```{r}
+outlierTest(best.model)
+```
+
+While unadjusted p-value shows that 17th observation is an outliner, Bonferroni correction makes it lose significance. Being cautious I will choose to leave the data point rather than removing it. 
+
+
+
+Check vif
+
+```{r}
+vif(best.model)
+
+```
+
+
+Compare the models
+
+```{r}
+anova(fit, best.model)
+```
+
+Our second model looks significantly better compared to the first model.
